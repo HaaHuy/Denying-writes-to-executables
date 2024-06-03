@@ -28,6 +28,18 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *file_name) 
 {
+  //  struct file *executable = filesys_open(file_name);
+  //   if (executable == NULL) {
+  //       return TID_ERROR;
+  //   }
+
+  //   // Deny writes to the executable file
+  //   file_deny_write(executable);
+    
+    
+  //   // Store the executable file in process structure for later use
+  //   // This is a simplified example, you might need to adjust based on your implementation
+  //   thread_current()->executable = executable;
   char *fn_copy;
   tid_t tid;
 
@@ -40,8 +52,20 @@ process_execute (const char *file_name)
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
+  if (tid == TID_ERROR){
+    palloc_free_page (fn_copy);
+  }  else {
+    struct file *executable = filesys_open(file_name);
+    if (executable == NULL) {
+      return TID_ERROR;
+    }
+
+    // Deny writes to the executable file
+    file_deny_write(executable);
+
+    // Store the executable file in process structure for later use
+    thread_current()->executable = executable;
+  } 
   return tid;
 }
 
@@ -95,8 +119,9 @@ process_wait (tid_t child_tid UNUSED)
 void
 process_exit (void)
 {
-  struct thread *cur = thread_current ();
+  struct thread *cur = thread_current();
   uint32_t *pd;
+
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -113,6 +138,12 @@ process_exit (void)
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
+    }
+          struct file *executable = cur->executable;
+    if (executable != NULL) {
+        // Allow writes to the executable file
+        file_allow_write(executable);
+        file_close(executable);
     }
 }
 
